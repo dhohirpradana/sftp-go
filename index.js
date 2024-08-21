@@ -46,7 +46,12 @@ app.post("/user-create", async (req, res) => {
 
   const { username, password } = data;
 
-  const client = await UserCreate(username, password, "admin", "admin");
+  const client = await UserCreate(
+    username,
+    password,
+    adminUsername,
+    adminPassword
+  );
   const statusCode = client.statusCode ?? 200;
 
   delete client.statusCode;
