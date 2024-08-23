@@ -1,57 +1,84 @@
-const express = require("express");
+import express from "express";
+import PocketBase from "pocketbase";
+
+import { userDelete, clientInfo } from "./sftpgo.js";
+import { updateUser } from "./pocketbase.js";
+import dotenv from "dotenv";
+
+dotenv.config();
+
 const app = express();
 const port = 3000;
-require("dotenv").config();
 
-const adminUsername = process.env.ADMIN_USERNAME;
-const adminPassword = process.env.ADMIN_PASSWORD;
+const pbUrl = process.env.PB_URL;
 
-const { clientInfo, UserCreate } = require("./sftpgo");
-const { validateUser } = require("./validation");
-
-// Middleware to parse JSON bodies
 app.use(express.json());
+
+app.use(async (req, res, next) => {
+  const pb = new PocketBase(pbUrl);
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    pb.authStore.save(token, null);
+
+    // console.log(pb.authStore.isValid);
+    // console.log(pb.authStore.token);
+    // console.log(pb.authStore);
+
+    next();
+  } catch (error) {
+    console.error("Error fetching current user:", error);
+    res.status(401).json({ error: "Invalid or expired token" });
+  }
+});
 
 app.get("/", (req, res) => {
   res.send("It's work!");
 });
 
-app.post("/client-info", async (req, res) => {
-  const data = req.body;
+// app.get("/test", async (req, res) => {
+//   // return await test(req, res);
+//   res.send("It's work!");
+// });
 
-  const validation = validateUser(data);
+app.post("/user", async (req, res) => {
+  return await updateUser(req, res);
+});
 
-  if (!validation.isValid) {
-    return res.status(400).json({ error: validation.message });
+app.delete("/user/:username", async (req, res) => {
+  const username = req.params.username;
+  // console.log("Username:", username);
+  if (!username) {
+    return res.status(402).json({ error: "username is required!" });
   }
 
-  const { username, password } = data;
-
-  const client = await clientInfo(username, password);
-  const statusCode = client.statusCode ?? 200;
+  const client = await userDelete(username);
+  const statusCode = client.statusCode;
 
   delete client.statusCode;
 
   res.status(statusCode).json(client);
 });
 
-app.post("/user-create", async (req, res) => {
+app.post("/token", async (req, res) => {
   const data = req.body;
-
-  const validation = validateUser(data);
-
-  if (!validation.isValid) {
-    return res.status(400).json({ error: validation.message });
-  }
 
   const { username, password } = data;
 
-  const client = await UserCreate(
-    username,
-    password,
-    adminUsername,
-    adminPassword
-  );
+  if (!username) {
+    return res.status(402).json({ error: "username is required!" });
+  }
+
+  if (!password) {
+    return res.status(402).json({ error: "password is required!" });
+  }
+
+  const client = await clientInfo(username, password);
   const statusCode = client.statusCode ?? 200;
 
   delete client.statusCode;

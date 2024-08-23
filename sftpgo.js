@@ -1,15 +1,18 @@
-const { createWriteStream } = require("fs");
+import { createWriteStream } from "fs";
+import dotenv from "dotenv";
+import { deletePbFtpPass, userByUsername } from "./pocketbase.js";
 
-require("dotenv").config();
+dotenv.config();
 
-const serverUrl = process.env.SERVER_URL;
-
-const {
+import {
   SFTPGoApiClient,
   createAxiosClient,
-} = require("sftpgo-api-client/dist/sftpgo-api-client/src/index");
+} from "sftpgo-api-client/dist/sftpgo-api-client/src/index.js";
+import { resolve } from "path";
 
-const { resolve } = require("path");
+const serverUrl = process.env.SERVER_URL;
+const adminUsername = process.env.ADMIN_USERNAME;
+const adminPassword = process.env.ADMIN_PASSWORD;
 
 async function clientInfo(username, password) {
   const axiosClient = await createAxiosClient({
@@ -28,7 +31,6 @@ async function clientInfo(username, password) {
     // Extract error details
     const errorResponse = error.response ? error.response.data : null;
     const statusCode = error.response ? error.response.status : null;
-    const errorMessage = error.message || "An error occurred";
 
     return {
       ...errorResponse,
@@ -88,7 +90,7 @@ async function AdminInfo(username, password) {
   return response.data;
 }
 
-async function UserCreate(username, password, adminUsername, adminPassword) {
+async function userCreate(username, ftpPass) {
   const client = new SFTPGoApiClient({
     createApiClientOption: { serverUrl: serverUrl },
     auth: { username: adminUsername, password: adminPassword, role: "admin" },
@@ -99,7 +101,7 @@ async function UserCreate(username, password, adminUsername, adminPassword) {
 
     const userData = {
       username: username,
-      password: password,
+      password: ftpPass,
       status: 1,
       permissions: {
         "/": ["list", "upload", "download"],
@@ -112,12 +114,43 @@ async function UserCreate(username, password, adminUsername, adminPassword) {
 
     const statusCode = response.status;
 
-    return { ...response.data, statusCode };
+    return { ...response.data, statusCode, state: true };
   } catch (error) {
     // Extract error details
     const errorResponse = error.response ? error.response.data : null;
     const statusCode = error.response ? error.response.status : null;
-    const errorMessage = error.message || "An error occurred";
+
+    return {
+      ...errorResponse,
+      statusCode,
+      state: false,
+    };
+  }
+}
+
+async function userDelete(username) {
+  // const user = await userByUsername(username, token, res);
+  // const userId = user.id;
+
+  // await deletePbFtpPass(userId, token);
+
+  const client = new SFTPGoApiClient({
+    createApiClientOption: { serverUrl: serverUrl },
+    auth: { username: adminUsername, password: adminPassword, role: "admin" },
+  });
+
+  try {
+    await client.ensureToken();
+
+    const response = await client.axiosClient.delete_user(username);
+
+    const statusCode = response.status;
+
+    return { ...response.data, statusCode };
+  } catch (error) {
+    // console.log(error.response);
+    const errorResponse = error.response ? error.response.data : null;
+    const statusCode = error.response ? error.response.status : null;
 
     return {
       ...errorResponse,
@@ -153,11 +186,4 @@ async function test() {
   // await listUserDirs();
 }
 
-// test();
-
-module.exports = {
-  clientInfo,
-  AdminInfo,
-  listUserDirs,
-  UserCreate,
-};
+export { userCreate, userDelete, clientInfo };

@@ -1,10 +1,17 @@
-function validateUser(data) {
-  const { username, password } = data;
+function validateUserCreate(data) {
+  const { username, pbUserId } = data;
 
-  if (!username || !password) {
+  if (!username) {
     return {
       isValid: false,
-      message: "Username and password cannot be empty.",
+      message: "username is required!",
+    };
+  }
+
+  if (!pbUserId) {
+    return {
+      isValid: false,
+      message: "pbUserId is required!",
     };
   }
 
@@ -14,4 +21,4 @@ function validateUser(data) {
   };
 }
 
-module.exports = { validateUser };
+export { validateUserCreate };
