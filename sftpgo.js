@@ -1,5 +1,6 @@
 import { createWriteStream } from "fs";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import { deletePbFtpPass, userByUsername } from "./pocketbase.js";
 
 dotenv.config();
@@ -14,27 +15,109 @@ const serverUrl = process.env.SERVER_URL;
 const adminUsername = process.env.ADMIN_USERNAME;
 const adminPassword = process.env.ADMIN_PASSWORD;
 
-async function clientInfo(username, password) {
+// Constants
+const ALGORITHM = "aes-256-cbc"; // AES encryption algorithm
+const KEY_LENGTH = 32; // Key length for AES-256
+const IV_LENGTH = 16; // Initialization vector length
+
+// Generate a key from a text key
+function generateKey(textKey) {
+  // Create a hash of the text key and use it as the encryption key
+  return crypto
+    .createHash("sha256")
+    .update(textKey)
+    .digest()
+    .slice(0, KEY_LENGTH);
+}
+
+// Encrypt function
+// function encrypt(username, password, textKey) {
+//   const key = generateKey(textKey);
+//   const iv = crypto.randomBytes(IV_LENGTH); // Generate a random IV
+
+//   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+//   let encrypted = cipher.update(username + ":" + password, "utf8", "hex");
+//   encrypted += cipher.final("hex");
+
+//   // Return the IV and encrypted text together
+//   return iv.toString("hex") + ":" + encrypted;
+// }
+
+// Decrypt function
+function decrypt(encryptedText, textKey) {
+  const key = generateKey(textKey); // Generate the key from the text key
+  const parts = encryptedText.split(":");
+  const iv = Buffer.from(parts.shift(), "hex");
+  const encrypted = parts.join(":");
+
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  let decrypted = decipher.update(encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+
+  // Return the decrypted result
+  return decrypted;
+}
+
+// Extract username and password
+function extractCredentials(decryptedText) {
+  const [username, password] = decryptedText.split(":");
+  return { username, password };
+}
+
+// Example usage
+const textKey = "mySecretPassphraseBODHA1120";
+// const username = "user";
+// const password = "pass123";
+
+// const encryptedText = encrypt(username, password, textKey);
+// console.log("Encrypted:", encryptedText);
+
+// const decryptedText = decrypt(encryptedText, textKey);
+// console.log("Decrypted:", decryptedText);
+
+// const credentials = extractCredentials(decryptedText);
+// console.log("Extracted Username:", credentials.username);
+// console.log("Extracted Password:", credentials.password);
+
+async function clientInfo(encryptedText) {
   const axiosClient = await createAxiosClient({
     serverUrl: serverUrl,
   });
 
   try {
-    const response = await axiosClient.get_user_token(undefined, undefined, {
-      auth: { username: username, password: password },
-    });
+    const decryptedText = decrypt(encryptedText, textKey);
+    console.log("Decrypted:", decryptedText);
 
-    const statusCode = response.status;
+    const credentials = extractCredentials(decryptedText);
+    // console.log("Extracted Username:", credentials.username);
+    // console.log("Extracted Password:", credentials.password);
 
-    return { ...response.data, statusCode };
+    try {
+      const response = await axiosClient.get_user_token(undefined, undefined, {
+        auth: {
+          username: credentials.username,
+          password: credentials.password,
+        },
+      });
+
+      const statusCode = response.status;
+
+      return { ...response.data, statusCode };
+    } catch (error) {
+      // Extract error details
+      const errorResponse = error.response ? error.response.data : null;
+      const statusCode = error.response ? error.response.status : null;
+
+      return {
+        ...errorResponse,
+        statusCode,
+      };
+    }
   } catch (error) {
-    // Extract error details
-    const errorResponse = error.response ? error.response.data : null;
-    const statusCode = error.response ? error.response.status : null;
-
     return {
-      ...errorResponse,
-      statusCode,
+      error: "invalid credentials!",
+      message: "Unauthorized",
+      statusCode: 401,
     };
   }
 }
@@ -156,6 +239,28 @@ async function userDelete(username) {
       ...errorResponse,
       statusCode,
     };
+  }
+}
+
+async function createUserDir(username, password, path) {
+  const client = new SFTPGoApiClient({
+    createApiClientOption: { serverUrl: serverUrl },
+    auth: { username: username, password: password },
+  });
+
+  // Ensure token is available
+  await client.ensureToken();
+
+  if (path == "" || !path) {
+    path = "/";
+  }
+
+  const response = await client.axiosClient.get_user_dir_contents({
+    path: path,
+  });
+
+  if (response.data != null) {
+    console.log("Files and Directories:", response.data);
   }
 }
 

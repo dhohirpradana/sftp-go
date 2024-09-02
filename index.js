@@ -26,7 +26,7 @@ app.use(async (req, res, next) => {
 
     pb.authStore.save(token, null);
 
-    // console.log(pb.authStore.isValid);
+    console.log(pb.authStore.isValid);
     // console.log(pb.authStore.token);
     // console.log(pb.authStore);
 
@@ -68,17 +68,13 @@ app.delete("/user/:username", async (req, res) => {
 app.post("/token", async (req, res) => {
   const data = req.body;
 
-  const { username, password } = data;
+  const { key } = data;
 
-  if (!username) {
-    return res.status(402).json({ error: "username is required!" });
+  if (!key) {
+    return res.status(402).json({ error: "key is required!" });
   }
 
-  if (!password) {
-    return res.status(402).json({ error: "password is required!" });
-  }
-
-  const client = await clientInfo(username, password);
+  const client = await clientInfo(key);
   const statusCode = client.statusCode ?? 200;
 
   delete client.statusCode;
