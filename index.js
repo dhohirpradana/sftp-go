@@ -2,7 +2,7 @@ import express from "express";
 import PocketBase from "pocketbase";
 
 import { userDelete, clientInfo } from "./sftpgo.js";
-import { updateUser, adminToken } from "./pocketbase.js";
+import { updateUser, adminToken, checkToken } from "./pocketbase.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -29,6 +29,8 @@ app.use(async (req, res, next) => {
     console.log(pb.authStore.isValid);
     // console.log(pb.authStore.token);
     // console.log(pb.authStore);
+
+    await checkToken(token);
 
     next();
   } catch (error) {

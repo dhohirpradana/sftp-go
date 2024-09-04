@@ -10,14 +10,11 @@ const pbAdminEmail = process.env.PB_ADMIN_EMAIL ?? "";
 const pbAdminPassword = process.env.PB_ADMIN_PASSWORD ?? "";
 const pb = new PocketBase(pbUrl);
 
-async function checkToken(req, res) {
+async function checkToken(token) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "No token provided" });
-    }
+    pb.authStore.save(token, null);
 
-    const token = authHeader.split(" ")[1];
+    await pb.collection("users").authRefresh();
 
     return token;
   } catch (error) {
@@ -156,4 +153,11 @@ async function updateUser(req, res) {
   }
 }
 
-export { updateUser, test, deletePbFtpPass, userByUsername, adminToken };
+export {
+  updateUser,
+  test,
+  deletePbFtpPass,
+  userByUsername,
+  adminToken,
+  checkToken,
+};
