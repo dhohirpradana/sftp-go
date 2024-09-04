@@ -2,7 +2,7 @@ import express from "express";
 import PocketBase from "pocketbase";
 
 import { userDelete, clientInfo } from "./sftpgo.js";
-import { updateUser } from "./pocketbase.js";
+import { updateUser, adminToken } from "./pocketbase.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -41,10 +41,10 @@ app.get("/", (req, res) => {
   res.send("It's work!");
 });
 
-// app.get("/test", async (req, res) => {
-//   // return await test(req, res);
-//   res.send("It's work!");
-// });
+app.get("/test", async (req, res) => {
+  await adminToken();
+  return res.send("It's Test!");
+});
 
 app.post("/user", async (req, res) => {
   return await updateUser(req, res);

@@ -6,6 +6,8 @@ import { v4 } from "uuid";
 dotenv.config();
 
 const pbUrl = process.env.PB_URL;
+const pbAdminEmail = process.env.PB_ADMIN_EMAIL ?? "";
+const pbAdminPassword = process.env.PB_ADMIN_PASSWORD ?? "";
 const pb = new PocketBase(pbUrl);
 
 async function checkToken(req, res) {
@@ -21,6 +23,23 @@ async function checkToken(req, res) {
   } catch (error) {
     console.error("Error fetching current user:", error);
     return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+async function adminToken() {
+  // console.log("Admin Email:", pbAdminEmail);
+  // console.log("Admin Password:", pbAdminPassword);
+
+  try {
+    await pb.admins.authWithPassword(pbAdminEmail, pbAdminPassword);
+
+    console.log("Admin: ", pb.authStore.isValid);
+    console.log("Admin Token: ", pb.authStore.token);
+    console.log(pb.authStore.model.id);
+
+    return pb.authStore.token;
+  } catch (error) {
+    return null;
   }
 }
 
@@ -45,7 +64,8 @@ async function test(req, res) {
   }
 }
 
-async function userByUsername(username, token, res) {
+async function userByUsername(username, res) {
+  var token = await adminToken();
   try {
     const userData = await pb
       .collection("users")
@@ -65,7 +85,8 @@ async function userByUsername(username, token, res) {
   }
 }
 
-async function deletePbFtpPass(userId, token) {
+async function deletePbFtpPass(userId) {
+  var token = await adminToken();
   console.log("Deleting PB ftpPass...");
   await pb.collection("users").update(
     userId,
@@ -81,10 +102,10 @@ async function deletePbFtpPass(userId, token) {
 }
 
 async function updateUser(req, res) {
+  var token = await adminToken();
   const ftpPass = v4();
   console.log(ftpPass);
 
-  const token = await checkToken(req, res);
   const data = req.body;
 
   const { username } = data;
@@ -93,7 +114,7 @@ async function updateUser(req, res) {
     return res.status(402).json({ error: "username is required!" });
   }
 
-  const user = await userByUsername(username, token, res);
+  const user = await userByUsername(username, res);
   const userId = user.id;
 
   try {
@@ -112,7 +133,7 @@ async function updateUser(req, res) {
       const statusCode = client.statusCode ?? 500;
       const state = client.state;
 
-      if (!state) await deletePbFtpPass(userId, token);
+      if (!state) await deletePbFtpPass(userId);
 
       delete client.statusCode;
       delete client.state;
@@ -135,4 +156,4 @@ async function updateUser(req, res) {
   }
 }
 
-export { updateUser, test, deletePbFtpPass, userByUsername };
+export { updateUser, test, deletePbFtpPass, userByUsername, adminToken };
