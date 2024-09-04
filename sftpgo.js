@@ -187,7 +187,7 @@ async function userCreate(username, ftpPass) {
       password: ftpPass,
       status: 1,
       permissions: {
-        "/": ["list", "upload", "download"],
+        "/": ["list", "upload", "download", "rename", "create_dirs", "delete"],
       },
       allow_api_key_auth: 1,
       allow_impersonation: true,
